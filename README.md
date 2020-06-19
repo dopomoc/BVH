@@ -5,7 +5,7 @@ BVHData - Class to read and display (in a simple format) BVH files
 
 Usage Example:
 
-bvhFileName = 'Example.bvh'
-bvhObject = BVHData()
-bvhObject.bvhRead(bvhFileName)
+bvhFileName = 'Example.bvh' <br>
+bvhObject = BVHData() <br>
+bvhObject.bvhRead(bvhFileName) <br>
 bvhObject.bvhDraw()
