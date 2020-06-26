@@ -14,7 +14,7 @@ Usage Example:
     <p>bvhObject.bvhRead(bvhFileName)</p>
     <p>bvhObject.bvhDraw()</p>
 
-The rootNode then starts the hierarchy of joints/nodes with associated data:
+The bvhObject.root then starts the hierarchy of joints/nodes with associated data:
     - Children (list of Nodes)
     - Num channels for this node
     - Names of channels in the node
