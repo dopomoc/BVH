@@ -1,7 +1,7 @@
 # BVH
 Class to work with BVH files. Will read a file, place it into a convinient format, and allow for fast display/playback of the sequence.
 
-NB - two samples files included in this repo from the CMU dataset. Modify the __main__ function accordingly if run as a programme.
+NB - two samples files included in this repo from the CMU dataset. Modify the __main__ function accordingly if run as a program.
 
 BVHData Class - v1.0
 
