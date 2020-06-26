@@ -9,10 +9,10 @@ Utility class for BVH Files
 Written by Darren Cosker 2020
 
 Usage Example:
-    bvhFileName = 'Example.bvh'
-    bvhObject = BVHData()
-    bvhObject.bvhRead(bvhFileName)
-    bvhObject.bvhDraw()
+    <p>bvhFileName = 'Example.bvh'</p>
+    <p>bvhObject = BVHData()</p>
+    <p>bvhObject.bvhRead(bvhFileName)</p>
+    <p>bvhObject.bvhDraw()</p>
 
 The rootNode then starts the hierarchy of joints/nodes with associated data:
     - Children (list of Nodes)
