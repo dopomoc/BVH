@@ -156,17 +156,12 @@ class BVHData:
                 # Slice through the MOTION array getting animation data for the root
                 rootNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + rootNode.numChannels]
                 self.channelTicker += rootNode.numChannels
-            
-                # What order is the rotation in? Re-order animation data to X, Y, Z if required
-                xRotPos = rootNode.channelNames.index('Xrotation')
-                yRotPos = rootNode.channelNames.index('Yrotation')
-                zRotPos = rootNode.channelNames.index('Zrotation')                
-            
+                                 
+                
                 # Make transformation matrix for this node
                 for frame in range(self.totalFrames):
-                    #rootNode.transMats.append(self.makeTransMat(rootNode.animation[frame,3:], rootNode.animation[frame,0:3]))
-                    newRot = [rootNode.animation[frame,xRotPos], rootNode.animation[frame,yRotPos], rootNode.animation[frame,zRotPos] ]
-                    rootNode.transMats.append(self.makeTransMat(newRot, rootNode.animation[frame,0:3]))
+                    
+                    rootNode.transMats.append(self.makeTransMat(rootNode.animation[frame,3:], rootNode.animation[frame,0:3], rootNode.channelNames))                                                            
                     thisMat = rootNode.transMats[frame]
                     rootNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]])
             
@@ -228,28 +223,20 @@ class BVHData:
         jointNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + jointNode.numChannels]
         self.channelTicker += jointNode.numChannels              
     
-        # What order is the rotation in? Re-order animation data to X, Y, Z if required
-        xRotPos = jointNode.channelNames.index('Xrotation')
-        yRotPos = jointNode.channelNames.index('Yrotation')
-        zRotPos = jointNode.channelNames.index('Zrotation')
-    
+        
         # Make transformation matrices for this node (mult by parent transMat)
         for frame in range(self.totalFrames):
             parentTrans = self.nodeStack[-1].transMats[frame]             
             
-            newRot = [jointNode.animation[frame,xRotPos], jointNode.animation[frame,yRotPos], jointNode.animation[frame,zRotPos] ]
-            
             if jointNode.numChannels==3:
                 # There is no additional translation of the bone, so just use offset for translation
-                #jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,0:3], jointNode.offset)))   
-                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(newRot, jointNode.offset)))                   
+                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,0:3], jointNode.offset, jointNode.channelNames)))                                      
                 
             else:
                 # There is an additional translation of the bone, so just offset + the translation
-                newTrans = [jointNode.offset[i] + jointNode.animation[frame][i] for i in range(len(jointNode.offset))]
-                #jointNode.transMats.append(self.makeTransMat(jointNode.animation[frame,3:], newTrans))
-                #jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,3:],newTrans)))   
-                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(newRot,newTrans)))   
+                #newTrans = [jointNode.offset[i] + jointNode.animation[frame][i] for i in range(len(jointNode.offset))]
+                newTrans = [jointNode.offset[i] + 0 for i in range(len(jointNode.offset))]                            
+                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,3:],newTrans, jointNode.channelNames)))                   
             
             
             thisMat = jointNode.transMats[-1]
@@ -279,7 +266,7 @@ class BVHData:
         # Make transformation matrices for this node (mult by parent transMat)
         for frame in range(self.totalFrames):
             parentTrans = self.nodeStack[-1].transMats[frame]             
-            endNode.transMats.append(np.matmul(parentTrans,self.makeTransMat([0,0,0], endNode.offset)))            
+            endNode.transMats.append(np.matmul(parentTrans,self.makeTransMat([0,0,0], endNode.offset, self.root.channelNames)))            
             thisMat = endNode.transMats[-1]
             endNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]]) 
     
@@ -320,18 +307,31 @@ class BVHData:
         
         return np.matmul(Rx,np.matmul(Ry,Rz))
 
-    def makeTransMat(self, axisAngles, transOffsets):
+    def makeTransMat(self, axisAngles, transOffsets, channelNames):
                 
         # Make a composite rotation matrix from axis angles x,y,z
+        # NB! for BVH files, very important that rotation concat follows
+        # order specified in channelNames for the current Node 
+        
+        # Get channel ordering + abbreviate
+        if(len(channelNames)==3):
+            xRotPos = channelNames.index('Xrotation')
+            yRotPos = channelNames.index('Yrotation')
+            zRotPos = channelNames.index('Zrotation')
+        else:
+            xRotPos = channelNames.index('Xrotation')-3
+            yRotPos = channelNames.index('Yrotation')-3
+            zRotPos = channelNames.index('Zrotation')-3            
+        
+        xRad = math.radians(axisAngles[xRotPos])
+        yRad = math.radians(axisAngles[yRotPos])
+        zRad = math.radians(axisAngles[zRotPos])        
+        
         Rx = np.zeros((3,3))
         Ry = np.zeros((3,3))
         Rz = np.zeros((3,3))
         transform = np.zeros((4,4))
-        
-        xRad = math.radians(axisAngles[0])
-        yRad = math.radians(axisAngles[1])
-        zRad = math.radians(axisAngles[2])
-        
+                
         Rx[0,0] = 1
         Rx[1,1] = math.cos(xRad)
         Rx[1,2] = - math.sin(xRad)
@@ -350,7 +350,32 @@ class BVHData:
         Rz[1,1] = math.cos(zRad)
         Rz[2,2] = 1        
         
-        transform[:3,:3] = np.matmul(Rx,np.matmul(Ry,Rz))
+        # Apply rotations in correct order                
+        #x,y,z
+        if(xRotPos==0) and (yRotPos==1) and (zRotPos==2):
+            transform[:3,:3] = np.matmul(Rx,np.matmul(Ry,Rz))
+        
+        #x,z,y
+        if(xRotPos==0) and (yRotPos==2) and (zRotPos==1):
+            transform[:3,:3] = np.matmul(Rx,np.matmul(Rz,Ry))
+        
+        #y,x,z
+        if(xRotPos==1) and (yRotPos==0) and (zRotPos==2):
+            transform[:3,:3] = np.matmul(Ry,np.matmul(Rx,Rz))
+        
+        #y,z,x
+        if(xRotPos==2) and (yRotPos==0) and (zRotPos==1):
+            transform[:3,:3] = np.matmul(Ry,np.matmul(Rz,Rx))
+        
+        #z,x,y
+        if(xRotPos==1) and (yRotPos==2) and (zRotPos==0):
+            transform[:3,:3] = np.matmul(Rz,np.matmul(Rx,Ry))
+        
+        #z,y,x
+        if(xRotPos==2) and (yRotPos==1) and (zRotPos==0):
+            transform[:3,:3] = np.matmul(Rz,np.matmul(Ry,Rx))
+                        
+        # Add translation
         transform[3,3] = 1    
         transform[0:3,3] = transOffsets
         
@@ -373,7 +398,7 @@ class BVHData:
         rootNode = self.root
         frame = 0
         frameStart = 0
-        frameEnd = self.totalFrames                
+        frameEnd = self.totalFrames-1              
         
         # Recursively read the Nodes from the BVH Object and store parent to children connections creating a bone list.
         # This makes for easier drawing
@@ -464,6 +489,7 @@ if __name__ == '__main__':
 
     # Default file to load for demo
     #bvhFileName = 'skeleton.bvh'
+    #bvhFileName = 'skeleton_motion_jump.bvh'
     bvhFileName = 'MartinFreestyle.bvh'
     bvhObject = BVHData()
     bvhObject.bvhRead(bvhFileName)
