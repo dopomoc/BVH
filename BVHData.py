@@ -17,6 +17,8 @@ The rootNode then starts the hierarchy of joints/nodes with associated data:
     - Animation data for the channel
     - Offset for the joint
     - Name of the joint
+    - Transformation matrix for the joint
+    - Joint coordinates
     
 Other notes:
     - Will read a BVH file into a hierarchical format
@@ -155,9 +157,16 @@ class BVHData:
                 rootNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + rootNode.numChannels]
                 self.channelTicker += rootNode.numChannels
             
+                # What order is the rotation in? Re-order animation data to X, Y, Z if required
+                xRotPos = rootNode.channelNames.index('Xrotation')
+                yRotPos = rootNode.channelNames.index('Yrotation')
+                zRotPos = rootNode.channelNames.index('Zrotation')                
+            
                 # Make transformation matrix for this node
                 for frame in range(self.totalFrames):
-                    rootNode.transMats.append(self.makeTransMat(rootNode.animation[frame,3:], rootNode.animation[frame,0:3]))
+                    #rootNode.transMats.append(self.makeTransMat(rootNode.animation[frame,3:], rootNode.animation[frame,0:3]))
+                    newRot = [rootNode.animation[frame,xRotPos], rootNode.animation[frame,yRotPos], rootNode.animation[frame,zRotPos] ]
+                    rootNode.transMats.append(self.makeTransMat(newRot, rootNode.animation[frame,0:3]))
                     thisMat = rootNode.transMats[frame]
                     rootNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]])
             
@@ -219,10 +228,30 @@ class BVHData:
         jointNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + jointNode.numChannels]
         self.channelTicker += jointNode.numChannels              
     
+        # What order is the rotation in? Re-order animation data to X, Y, Z if required
+        xRotPos = jointNode.channelNames.index('Xrotation')
+        yRotPos = jointNode.channelNames.index('Yrotation')
+        zRotPos = jointNode.channelNames.index('Zrotation')
+    
         # Make transformation matrices for this node (mult by parent transMat)
         for frame in range(self.totalFrames):
             parentTrans = self.nodeStack[-1].transMats[frame]             
-            jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,0:3], jointNode.offset)))            
+            
+            newRot = [jointNode.animation[frame,xRotPos], jointNode.animation[frame,yRotPos], jointNode.animation[frame,zRotPos] ]
+            
+            if jointNode.numChannels==3:
+                # There is no additional translation of the bone, so just use offset for translation
+                #jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,0:3], jointNode.offset)))   
+                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(newRot, jointNode.offset)))                   
+                
+            else:
+                # There is an additional translation of the bone, so just offset + the translation
+                newTrans = [jointNode.offset[i] + jointNode.animation[frame][i] for i in range(len(jointNode.offset))]
+                #jointNode.transMats.append(self.makeTransMat(jointNode.animation[frame,3:], newTrans))
+                #jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,3:],newTrans)))   
+                jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(newRot,newTrans)))   
+            
+            
             thisMat = jointNode.transMats[-1]
             jointNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]])             
         
@@ -434,8 +463,9 @@ if __name__ == '__main__':
     print('System inputs', sys.argv)
 
     # Default file to load for demo
+    #bvhFileName = 'skeleton.bvh'
     bvhFileName = 'MartinFreestyle.bvh'
     bvhObject = BVHData()
     bvhObject.bvhRead(bvhFileName)
-    bvhObject.bvhDraw(4) #takes frameStep parameter
+    bvhObject.bvhDraw(1) #takes frameStep parameter
     
