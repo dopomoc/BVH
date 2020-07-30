@@ -66,11 +66,17 @@ class BVHData:
         self.plotMinMax = []
         self.jointPlots = []
         self.bonePlots = []
+        self.bindTfrms = [] #Store the joint bind poses - makes skinning easier       
+        self.bindPoseFrame = -1        
         
     
     def bvhRead(self, bvhFileName):
         
         '''
+        # NB - Default assumes no bind pose is given in the BVH file.
+        # If there is a bind pose, then should call bvhRead with bindPoseFrame
+        # set to correct frame, i.e. frame where this lives (see __main__).
+        #
         # Open BVH file and read the MOTION first then the HIERARCHY.
         # I'm doing this so that when I create the Node hierarchy I can store the
         # motion data for a Node on the fly in the first pass (and not have to DFS)
@@ -79,12 +85,12 @@ class BVHData:
         '''
         print('Reading BVH File..', bvhFileName)
         
-        bvhFile = open(bvhFileName)
-                      
+        bvhFile = open(bvhFileName)                     
+        self.fileName = bvhFileName
+        
         self.allLines = bvhFile.read().split("\n") # Split each line by \n
         numLines = len(self.allLines) 
         nodeCount = 0        
-
 
         ##############################################
         # Read MOTION into a numpy array
@@ -164,6 +170,11 @@ class BVHData:
                     rootNode.transMats.append(self.makeTransMat(rootNode.animation[frame,3:], rootNode.animation[frame,0:3], rootNode.channelNames))                                                            
                     thisMat = rootNode.transMats[frame]
                     rootNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]])
+                    
+                    # Store the bind pose for this node
+                    if frame == self.bindPoseFrame:
+                        self.bindTfrms.append(np.linalg.inv(rootNode.transMats[frame]))
+                        
             
                 # Associate this with main root of the BVH class
                 self.root = rootNode
@@ -235,9 +246,13 @@ class BVHData:
             else:
                 # There is an additional translation of the bone, so just offset + the translation
                 #newTrans = [jointNode.offset[i] + jointNode.animation[frame][i] for i in range(len(jointNode.offset))]
-                newTrans = [jointNode.offset[i] + 0 for i in range(len(jointNode.offset))]                            
+                temp = [0,0,0]
+                newTrans = [jointNode.offset[i] + temp[i] for i in range(len(jointNode.offset))]                            
                 jointNode.transMats.append(np.matmul(parentTrans,self.makeTransMat(jointNode.animation[frame,3:],newTrans, jointNode.channelNames)))                   
             
+            # Store the bind pose for this node
+            if frame == self.bindPoseFrame:
+                self.bindTfrms.append(np.linalg.inv(jointNode.transMats[frame]))
             
             thisMat = jointNode.transMats[-1]
             jointNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]])             
@@ -269,6 +284,10 @@ class BVHData:
             endNode.transMats.append(np.matmul(parentTrans,self.makeTransMat([0,0,0], endNode.offset, self.root.channelNames)))            
             thisMat = endNode.transMats[-1]
             endNode.jointCoords.append([thisMat[0,3],thisMat[1,3],thisMat[2,3]]) 
+            
+            # Store the bind pose for this node
+            if frame == self.bindPoseFrame:
+                self.bindTfrms.append(np.linalg.inv(endNode.transMats[frame]))
     
         # Make this joint a child of whatever is top of the stack
         self.nodeStack[-1].childNodes.append(endNode)    
@@ -398,10 +417,11 @@ class BVHData:
         rootNode = self.root
         frame = 0
         frameStart = 0
-        frameEnd = self.totalFrames-1              
+        frameEnd = self.totalFrames              
         
-        # Recursively read the Nodes from the BVH Object and store parent to children connections creating a bone list.
-        # This makes for easier drawing
+        # Recursively read the 'pre estimated absolte Node coords' 
+        # from the BVH Object and store parent to children connections creating a bone list.
+        # This makes for easier drawing. NB - to see how to estimate abs coords see bvhRead func.
         for frame in range(frameStart,frameEnd,frameStep):
                         
             currentJointCoords = rootNode.jointCoords[frame]            
@@ -448,7 +468,7 @@ class BVHData:
 
 
     def drawSkeleton(self, frame):
-        
+                
         if frame> len(self.animationPreview):
             self.ani.event_source.stop()
             
@@ -489,9 +509,10 @@ if __name__ == '__main__':
 
     # Default file to load for demo
     #bvhFileName = 'skeleton.bvh'
-    #bvhFileName = 'skeleton_motion_jump.bvh'
-    bvhFileName = 'MartinFreestyle.bvh'
+    bvhFileName = 'skeleton_motion_jump.bvh' # bind pose is on frame 147 / see below
+    #bvhFileName = 'MartinFreestyle.bvh'    
     bvhObject = BVHData()
+    bvhObject.bindPoseFrame = 147  # index of the bind pose in the BVH animation/file (default is -1 i.e. no bind pose in BVH)
     bvhObject.bvhRead(bvhFileName)
     bvhObject.bvhDraw(1) #takes frameStep parameter
     
