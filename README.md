@@ -32,6 +32,6 @@ Other notes:<br>
         https://research.cs.wisc.edu/graphics/Courses/cs-838-1999/Jeff/BVH.html<br>
         http://www.dcs.shef.ac.uk/intranet/research/public/resmes/CS0111.pdf<br>
 
-Example of Linear Blend Skinning (LBS) created by the class:
+Example of BVH visualisation created by the class:
 
 ![Poly-LBS](https://github.com/dopomoc/BVH/blob/master/skeleton_motion_jump.bvh.gif)
