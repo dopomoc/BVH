@@ -465,7 +465,11 @@ class BVHData:
         self.ani = animation.FuncAnimation(self.fig, self.drawSkeleton, interval=1, repeat=False)
         plt.show()
 
-
+        # Create gif movie
+        outputFileName = "{}.gif"
+        outputFileName.format(bvhObject.fileName)
+        print('Writing ',outputFileName.format(bvhObject.fileName))
+        self.ani.save(outputFileName.format(bvhObject.fileName), writer=animation.PillowWriter(fps=30))
 
     def drawSkeleton(self, frame):
                 
