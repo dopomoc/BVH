@@ -48,6 +48,7 @@ class Node:
         self.name = "Joint Name"   
         self.transMats = []           
         self.jointCoords = []
+        self.channelIndices = []
 
 class BVHData:
 
@@ -161,6 +162,7 @@ class BVHData:
             
                 # Slice through the MOTION array getting animation data for the root
                 rootNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + rootNode.numChannels]
+                rootNode.channelIndices = [self.channelTicker, self.channelTicker + rootNode.numChannels]
                 self.channelTicker += rootNode.numChannels
                                  
                 
@@ -232,6 +234,7 @@ class BVHData:
         
         # Slice through the MOTION array getting animation data for this joint
         jointNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + jointNode.numChannels]
+        jointNode.channelIndices = [self.channelTicker, self.channelTicker + jointNode.numChannels]
         self.channelTicker += jointNode.numChannels              
     
         
@@ -276,6 +279,7 @@ class BVHData:
         
         # Slice through the MOTION array getting animation data for this joint
         endNode.animation = self.allMotion[:,self.channelTicker:self.channelTicker + endNode.numChannels]
+        endNode.channelIndices = [self.channelTicker, self.channelTicker + endNode.numChannels]
         self.channelTicker += endNode.numChannels 
     
         # Make transformation matrices for this node (mult by parent transMat)
